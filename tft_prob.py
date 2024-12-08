@@ -1,5 +1,6 @@
 from numpy import random
 import pandas as pd
+import numpy as np
 
 unit_costs = [1, 2, 3, 4, 5]
 
@@ -126,8 +127,39 @@ def monte_carlo_shop_roll_odd(level, cost, gold, target_unit_out_count, cost_uni
     print(f"Cost Odds:\n{cost_odds}")
     print(f"At Least X Target Champion Odds:\n{at_least_x_target_champion_odds}")
 
-    return df
+    return df, at_least_x_target_champion_odds
 
+def monte_carlo_shop_roll_odd_optimized(level, cost, gold, target_unit_out_count, cost_unit_out_count):
+    iterations = 1000
+    total_rolls = int(gold / 2) * 5
+
+    # Precompute probabilities
+    odds = np.array(shop_cost_roll_odds[level])
+    target_unit = 1
+    pool_size = unit_pool_size[cost]
+    count = unit_count[cost]
+    total_pool_size = (pool_size * count) - cost_unit_out_count
+    target_unit_pool_size = pool_size - target_unit_out_count
+
+    # Weights for target unit and other units
+    target_unit_weight = target_unit_pool_size / total_pool_size
+    other_unit_weight = (1 - target_unit_weight) / (count - 1)
+    unit_weights = [target_unit_weight] + [other_unit_weight] * (count - 1)
+
+    # Simulate rolls
+    shop_costs = np.random.choice(unit_costs, p=odds, size=(iterations, total_rolls))
+    target_counts = np.sum(
+        (shop_costs == cost)
+        & (np.random.choice(range(1, count + 1), p=unit_weights, size=(iterations, total_rolls)) == target_unit),
+        axis=1,
+    )
+
+    # Compute probabilities for "at least X target champions"
+    at_least_x_target_champion_odds = {
+        x: np.mean(target_counts >= x) for x in range(1, 10)
+    }
+
+    return at_least_x_target_champion_odds
 
 def main():
     level = int(input("Enter your Level: "))
@@ -136,7 +168,7 @@ def main():
     cost_unit_out_count = int(input("How many units of that COST are out (in total, including your desired units): "))
     gold = int(input("How much gold would you like to roll: "))
 
-    df = monte_carlo_shop_roll_odd(level, cost, gold, target_unit_out_count, cost_unit_out_count)
+    df, data_dict = monte_carlo_shop_roll_odd(level, cost, gold, target_unit_out_count, cost_unit_out_count)
     df.to_excel(f"monte_carlo_tft-level-{level}-cost-{cost}-tuco-{target_unit_out_count}-cuoc-{cost_unit_out_count}-gold-{gold}.xlsx")
 
 
